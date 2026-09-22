@@ -21,25 +21,78 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 private val Blue = Color(0xFF155EEF)
 private val Navy = Color(0xFF071B3A)
 private val Gold = Color(0xFFFFB800)
 
+private val thematicCategoryOrder = listOf(
+    "generalista",
+    "ambiente",
+    "cinema",
+    "cronaca",
+    "cultura",
+    "economia",
+    "gastronomia",
+    "musica",
+    "politica",
+    "religione",
+    "scienza",
+    "scuola",
+    "sport",
+    "tecnologia",
+    "viaggi"
+)
+
+private fun categoryRank(category: String): Int {
+    val index = thematicCategoryOrder.indexOfFirst {
+        it.equals(category, ignoreCase = true)
+    }
+    return if (index >= 0) index else thematicCategoryOrder.size
+}
+
+private fun categoryLabel(category: String): String =
+    when (category.lowercase(Locale.ITALIAN)) {
+        "generalista" -> "Italia"
+        "ambiente" -> "Ambiente e territorio"
+        "cinema" -> "Film, serie TV e cinema"
+        "cronaca" -> "Gossip e cronaca"
+        "cultura" -> "Cultura, arte e storia"
+        "economia" -> "Economia e finanze"
+        "gastronomia" -> "Gastronomia"
+        "musica" -> "Musica"
+        "politica" -> "Politica ed esteri"
+        "religione" -> "Religioni e spiritualità"
+        "scienza" -> "Scienza e medicina"
+        "scuola" -> "Scuola e università"
+        "sport" -> "Sport"
+        "tecnologia" -> "Tecnologia"
+        "viaggi" -> "Viaggi e turismo"
+        else -> category
+    }
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            val colors = lightColorScheme(primary = Blue, secondary = Gold, surfaceVariant = Color(0xFFF0F4FA))
-            MaterialTheme(colorScheme = colors) { MondoFeedScreen() }
+            val colors = lightColorScheme(
+                primary = Blue,
+                secondary = Gold,
+                surfaceVariant = Color(0xFFF0F4FA)
+            )
+            MaterialTheme(colorScheme = colors) {
+                MondoFeedScreen()
+            }
         }
     }
 }
@@ -51,11 +104,36 @@ fun MondoFeedScreen(vm: MainViewModel = viewModel()) {
     val favorites by vm.favoriteSources.collectAsState()
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    var selectedCountry by remember { mutableStateOf<String?>(null) }
+
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
     var selectedSource by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
     var articleUrl by remember { mutableStateOf<String?>(null) }
-    val grouped = remember(state.sources) { state.sources.filter { it.enabled }.groupBy { it.country }.toSortedMap() }
+
+    val groupedByCategory = remember(state.sources) {
+        state.sources
+            .asSequence()
+            .filter { it.enabled }
+            .groupBy { it.category.trim().ifBlank { "Altro" } }
+            .mapValues { (_, sources) ->
+                sources.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+            }
+    }
+
+    val orderedCategories = remember(groupedByCategory) {
+        groupedByCategory.keys.sortedWith(
+            compareBy<String> { categoryRank(it) }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { categoryLabel(it) }
+        )
+    }
+
+    val expandedCategories = remember { mutableStateMapOf<String, Boolean>() }
+
+    val selectedCategorySources = remember(selectedCategory, groupedByCategory) {
+        selectedCategory
+            ?.let { groupedByCategory[it].orEmpty().map { source -> source.name }.toSet() }
+            .orEmpty()
+    }
 
     if (articleUrl != null) {
         InternalArticle(url = articleUrl!!, onClose = { articleUrl = null })
@@ -65,19 +143,133 @@ fun MondoFeedScreen(vm: MainViewModel = viewModel()) {
     ModalNavigationDrawer(
         drawerState = drawer,
         drawerContent = {
-            ModalDrawerSheet(Modifier.fillMaxWidth(.60f).fillMaxHeight(), drawerContainerColor = Color.White) {
-                Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Navy, Blue))).padding(20.dp)) {
-                    Column { Text("MONDOFEED", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black); Text("La stampa mondiale in una sola app", color = Color.White.copy(.8f), style = MaterialTheme.typography.bodySmall) }
+            ModalDrawerSheet(
+                modifier = Modifier
+                    .fillMaxWidth(.60f)
+                    .fillMaxHeight(),
+                drawerContainerColor = Color.White
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(Brush.verticalGradient(listOf(Navy, Blue)))
+                        .padding(20.dp)
+                ) {
+                    Column {
+                        Text(
+                            "MONDOFEED",
+                            color = Color.White,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Black
+                        )
+                        Text(
+                            "La stampa mondiale in una sola app",
+                            color = Color.White.copy(.8f),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
-                Text("Tutte le notizie", Modifier.fillMaxWidth().clickable { selectedCountry=null; selectedSource=null; scope.launch { drawer.close() } }.padding(16.dp), fontWeight = FontWeight.Bold, color = Blue)
+
+                Text(
+                    text = "Tutte le notizie",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            selectedCategory = null
+                            selectedSource = null
+                            scope.launch { drawer.close() }
+                        }
+                        .padding(16.dp),
+                    fontWeight = FontWeight.Bold,
+                    color = Blue
+                )
                 HorizontalDivider()
+
                 LazyColumn {
-                    grouped.forEach { (country, sources) ->
-                        item("c-$country") { Text(country.uppercase(), Modifier.fillMaxWidth().background(Color(0xFFF3F6FB)).clickable { selectedCountry=country; selectedSource=null; scope.launch { drawer.close() } }.padding(12.dp,10.dp), fontWeight=FontWeight.Black, color=Navy) }
-                        items(sources, key={it.id}) { source ->
-                            Row(Modifier.fillMaxWidth().clickable { selectedCountry=source.country; selectedSource=source.name; scope.launch { drawer.close() } }.padding(start=18.dp,end=4.dp), verticalAlignment=Alignment.CenterVertically) {
-                                Text(source.name, Modifier.weight(1f).padding(vertical=13.dp), style=MaterialTheme.typography.bodyMedium)
-                                IconButton(onClick={vm.toggleFavoriteSource(source.id)}) { Text(if(source.id in favorites) "★" else "☆", color=if(source.id in favorites) Gold else Color.Gray, style=MaterialTheme.typography.titleLarge) }
+                    orderedCategories.forEach { category ->
+                        val sources = groupedByCategory[category].orEmpty()
+                        val isExpanded = expandedCategories[category]
+                            ?: category.equals("generalista", ignoreCase = true)
+
+                        item(key = "category-$category") {
+                            ListItem(
+                                headlineContent = {
+                                    Text(
+                                        text = categoryLabel(category).uppercase(Locale.ITALIAN),
+                                        fontWeight = FontWeight.Black,
+                                        color = Navy
+                                    )
+                                },
+                                supportingContent = {
+                                    Text("${sources.size} fonti")
+                                },
+                                trailingContent = {
+                                    Text(
+                                        text = if (isExpanded) "▴" else "▾",
+                                        color = Blue,
+                                        style = MaterialTheme.typography.titleLarge
+                                    )
+                                },
+                                colors = ListItemDefaults.colors(
+                                    containerColor = Color(0xFFF3F6FB)
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        expandedCategories[category] = !isExpanded
+                                    }
+                            )
+                            HorizontalDivider()
+                        }
+
+                        if (isExpanded) {
+                            item(key = "all-$category") {
+                                Text(
+                                    text = "Tutte: ${categoryLabel(category)}",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            selectedCategory = category
+                                            selectedSource = null
+                                            scope.launch { drawer.close() }
+                                        }
+                                        .padding(start = 18.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                                    fontWeight = FontWeight.Bold,
+                                    color = Blue
+                                )
+                            }
+
+                            items(sources, key = { it.id }) { source ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            selectedCategory = category
+                                            selectedSource = source.name
+                                            scope.launch { drawer.close() }
+                                        }
+                                        .padding(start = 18.dp, end = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = source.name,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(vertical = 13.dp),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    IconButton(
+                                        onClick = { vm.toggleFavoriteSource(source.id) }
+                                    ) {
+                                        Text(
+                                            text = if (source.id in favorites) "★" else "☆",
+                                            color = if (source.id in favorites) Gold else Color.Gray,
+                                            style = MaterialTheme.typography.titleLarge
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -85,44 +277,198 @@ fun MondoFeedScreen(vm: MainViewModel = viewModel()) {
             }
         }
     ) {
-        Scaffold(containerColor=Color(0xFFF5F7FB), topBar={
-            TopAppBar(
-                colors=TopAppBarDefaults.topAppBarColors(containerColor=Navy, titleContentColor=Color.White, navigationIconContentColor=Color.White),
-                navigationIcon={IconButton(onClick={scope.launch{drawer.open()} }){Text("☰",color=Color.White,style=MaterialTheme.typography.headlineSmall)}},
-                title={Column{Text("MondoFeed",fontWeight=FontWeight.Black);Text(selectedSource?:selectedCountry?:"Edizione globale",style=MaterialTheme.typography.labelSmall,color=Color.White.copy(.75f))}},
-                actions={IconButton(onClick={vm.refresh()}){Text("↻",color=Color.White,style=MaterialTheme.typography.headlineSmall)}}
-            )
-        }) { padding ->
+        Scaffold(
+            containerColor = Color(0xFFF5F7FB),
+            topBar = {
+                TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Navy,
+                        titleContentColor = Color.White,
+                        navigationIconContentColor = Color.White
+                    ),
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawer.open() } }) {
+                            Text(
+                                "☰",
+                                color = Color.White,
+                                style = MaterialTheme.typography.headlineSmall
+                            )
+                        }
+                    },
+                    title = {
+                        Column {
+                            Text("MondoFeed", fontWeight = FontWeight.Black)
+                            Text(
+                                text = selectedSource
+                                    ?: selectedCategory?.let(::categoryLabel)
+                                    ?: "Edizione globale",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(.75f)
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { vm.refresh() }) {
+                            Text(
+                                "↻",
+                                color = Color.White,
+                                style = MaterialTheme.typography.headlineSmall
+                            )
+                        }
+                    }
+                )
+            }
+        ) { padding ->
             Column(Modifier.padding(padding)) {
-                Box(Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(Navy,Blue))).padding(16.dp)) {
-                    OutlinedTextField(query,{query=it},Modifier.fillMaxWidth(),placeholder={Text("Cerca tra le notizie...")},singleLine=true,shape=RoundedCornerShape(18.dp),colors=OutlinedTextFieldDefaults.colors(focusedContainerColor=Color.White,unfocusedContainerColor=Color.White,focusedBorderColor=Gold,unfocusedBorderColor=Color.Transparent))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(Brush.horizontalGradient(listOf(Navy, Blue)))
+                        .padding(16.dp)
+                ) {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Cerca tra le notizie...") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(18.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White,
+                            focusedBorderColor = Gold,
+                            unfocusedBorderColor = Color.Transparent
+                        )
+                    )
                 }
-                if(state.loading) LinearProgressIndicator(Modifier.fillMaxWidth(),color=Gold)
-                val shown=state.articles.filter { a -> (query.isBlank()||a.title.contains(query,true)||a.source.contains(query,true))&&(selectedCountry==null||a.country==selectedCountry)&&(selectedSource==null||a.source==selectedSource) }
-                if(shown.isEmpty()&&!state.loading) Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){Text(state.error?:"Nessuna notizia per questo filtro",color=Color.Gray)}
-                LazyColumn(Modifier.padding(horizontal=12.dp),contentPadding=PaddingValues(vertical=12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                    items(shown,key={it.link}) { a ->
-                        Card(Modifier.fillMaxWidth().clickable{articleUrl=a.link},shape=RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=Color.White),elevation=CardDefaults.cardElevation(3.dp)) {
-                            if (!a.imageUrl.isNullOrBlank()) {
+
+                if (state.loading) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth(), color = Gold)
+                }
+
+                val shown = state.articles.filter { article ->
+                    val matchesQuery = query.isBlank() ||
+                        article.title.contains(query, true) ||
+                        article.source.contains(query, true)
+
+                    val matchesCategory = selectedCategory == null ||
+                        article.source in selectedCategorySources
+
+                    val matchesSource = selectedSource == null ||
+                        article.source == selectedSource
+
+                    matchesQuery && matchesCategory && matchesSource
+                }
+
+                if (shown.isEmpty() && !state.loading) {
+                    Box(
+                        Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            state.error ?: "Nessuna notizia per questo filtro",
+                            color = Color.Gray
+                        )
+                    }
+                }
+
+                LazyColumn(
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    contentPadding = PaddingValues(vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(shown, key = { it.link }) { article ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { articleUrl = article.link },
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            elevation = CardDefaults.cardElevation(3.dp)
+                        ) {
+                            if (!article.imageUrl.isNullOrBlank()) {
                                 AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current).data(a.imageUrl).crossfade(true).build(),
-                                    contentDescription = "Immagine della notizia: ${a.title}",
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(article.imageUrl)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = "Immagine della notizia: ${article.title}",
                                     contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxWidth().height(190.dp)
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(190.dp)
                                 )
                             } else {
                                 Box(
-                                    modifier = Modifier.fillMaxWidth().height(110.dp).background(Brush.horizontalGradient(listOf(Navy, Blue))),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(110.dp)
+                                        .background(
+                                            Brush.horizontalGradient(listOf(Navy, Blue))
+                                        ),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(a.source.uppercase(), color = Color.White, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        article.source.uppercase(Locale.ITALIAN),
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Black,
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
                                 }
                             }
+
                             Column(Modifier.padding(16.dp)) {
-                                Row(verticalAlignment=Alignment.CenterVertically){Box(Modifier.size(9.dp).background(Blue,RoundedCornerShape(9.dp)));Spacer(Modifier.width(8.dp));Text(a.source.uppercase(),Modifier.weight(1f),color=Blue,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelMedium);Text(a.displayDateTime,color=Color.Gray,style=MaterialTheme.typography.labelSmall)}
-                                Text(a.title,Modifier.padding(top=10.dp),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Black,color=Navy)
-                                if(a.description.isNotBlank()) Text(a.description.take(240),Modifier.padding(top=8.dp),style=MaterialTheme.typography.bodyMedium,color=Color(0xFF526071))
-                                Row(Modifier.padding(top=12.dp),verticalAlignment=Alignment.CenterVertically){AssistChip(onClick={},label={Text(a.country)});Spacer(Modifier.weight(1f));Text("LEGGI NELL'APP  ›",color=Blue,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelMedium)}
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        Modifier
+                                            .size(9.dp)
+                                            .background(Blue, RoundedCornerShape(9.dp))
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        article.source.uppercase(Locale.ITALIAN),
+                                        Modifier.weight(1f),
+                                        color = Blue,
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                    Text(
+                                        article.displayDateTime,
+                                        color = Color.Gray,
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
+                                Text(
+                                    article.title,
+                                    Modifier.padding(top = 10.dp),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Black,
+                                    color = Navy
+                                )
+                                if (article.description.isNotBlank()) {
+                                    Text(
+                                        article.description.take(240),
+                                        Modifier.padding(top = 8.dp),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color(0xFF526071)
+                                    )
+                                }
+                                Row(
+                                    Modifier.padding(top = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    AssistChip(
+                                        onClick = {},
+                                        label = { Text(article.country) }
+                                    )
+                                    Spacer(Modifier.weight(1f))
+                                    Text(
+                                        "LEGGI NELL'APP  ›",
+                                        color = Blue,
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
                             }
                         }
                     }
@@ -135,14 +481,65 @@ fun MondoFeedScreen(vm: MainViewModel = viewModel()) {
 @SuppressLint("SetJavaScriptEnabled")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun InternalArticle(url:String,onClose:()->Unit) {
+private fun InternalArticle(url: String, onClose: () -> Unit) {
     var webView by remember { mutableStateOf<WebView?>(null) }
     var loading by remember { mutableStateOf(true) }
-    BackHandler { if(webView?.canGoBack()==true) webView?.goBack() else onClose() }
-    Scaffold(topBar={TopAppBar(colors=TopAppBarDefaults.topAppBarColors(containerColor=Navy,titleContentColor=Color.White),navigationIcon={IconButton(onClick=onClose){Text("‹",color=Color.White,style=MaterialTheme.typography.headlineMedium)}},title={Text("Articolo",fontWeight=FontWeight.Bold)},actions={IconButton(onClick={webView?.reload()}){Text("↻",color=Color.White)}})}) { padding ->
-        Box(Modifier.padding(padding).fillMaxSize()) {
-            AndroidView(factory={ctx->WebView(ctx).apply{webView=this;settings.javaScriptEnabled=true;settings.domStorageEnabled=true;settings.loadsImagesAutomatically=true;webViewClient=object:WebViewClient(){override fun onPageFinished(view:WebView?,url:String?){loading=false}};webChromeClient=WebChromeClient();loadUrl(url)}},modifier=Modifier.fillMaxSize())
-            if(loading) LinearProgressIndicator(Modifier.fillMaxWidth(),color=Gold)
+
+    BackHandler {
+        if (webView?.canGoBack() == true) webView?.goBack() else onClose()
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Navy,
+                    titleContentColor = Color.White
+                ),
+                navigationIcon = {
+                    IconButton(onClick = onClose) {
+                        Text(
+                            "‹",
+                            color = Color.White,
+                            style = MaterialTheme.typography.headlineMedium
+                        )
+                    }
+                },
+                title = { Text("Articolo", fontWeight = FontWeight.Bold) },
+                actions = {
+                    IconButton(onClick = { webView?.reload() }) {
+                        Text("↻", color = Color.White)
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Box(
+            Modifier
+                .padding(padding)
+                .fillMaxSize()
+        ) {
+            AndroidView(
+                factory = { context ->
+                    WebView(context).apply {
+                        webView = this
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.loadsImagesAutomatically = true
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                loading = false
+                            }
+                        }
+                        webChromeClient = WebChromeClient()
+                        loadUrl(url)
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+            if (loading) {
+                LinearProgressIndicator(Modifier.fillMaxWidth(), color = Gold)
+            }
         }
     }
 }
