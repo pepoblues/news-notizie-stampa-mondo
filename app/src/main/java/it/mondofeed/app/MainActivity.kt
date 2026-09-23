@@ -229,6 +229,7 @@ fun MondoFeedScreen(vm: MainViewModel = viewModel()) {
                                         .clickable {
                                             selectedCategory = category
                                             selectedSource = null
+                                            vm.selectCategory(category)
                                             scope.launch { drawer.close() }
                                         }
                                         .padding(start = 18.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
