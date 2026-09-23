@@ -136,9 +136,12 @@ fun MondoFeedScreen(vm: MainViewModel = viewModel()) {
     }
 
     if (articleUrl != null) {
-        InternalArticle(url = articleUrl!!, onClose = { articleUrl = null })
-        return
-    }
+    InternalBrowser(
+        url = articleUrl!!,
+        onClose = { articleUrl = null }
+    )
+    return
+}
 
     ModalNavigationDrawer(
         drawerState = drawer,
@@ -473,72 +476,6 @@ fun MondoFeedScreen(vm: MainViewModel = viewModel()) {
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-@SuppressLint("SetJavaScriptEnabled")
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun InternalArticle(url: String, onClose: () -> Unit) {
-    var webView by remember { mutableStateOf<WebView?>(null) }
-    var loading by remember { mutableStateOf(true) }
-
-    BackHandler {
-        if (webView?.canGoBack() == true) webView?.goBack() else onClose()
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Navy,
-                    titleContentColor = Color.White
-                ),
-                navigationIcon = {
-                    IconButton(onClick = onClose) {
-                        Text(
-                            "‹",
-                            color = Color.White,
-                            style = MaterialTheme.typography.headlineMedium
-                        )
-                    }
-                },
-                title = { Text("Articolo", fontWeight = FontWeight.Bold) },
-                actions = {
-                    IconButton(onClick = { webView?.reload() }) {
-                        Text("↻", color = Color.White)
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        Box(
-            Modifier
-                .padding(padding)
-                .fillMaxSize()
-        ) {
-            AndroidView(
-                factory = { context ->
-                    WebView(context).apply {
-                        webView = this
-                        settings.javaScriptEnabled = true
-                        settings.domStorageEnabled = true
-                        settings.loadsImagesAutomatically = true
-                        webViewClient = object : WebViewClient() {
-                            override fun onPageFinished(view: WebView?, url: String?) {
-                                loading = false
-                            }
-                        }
-                        webChromeClient = WebChromeClient()
-                        loadUrl(url)
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-            if (loading) {
-                LinearProgressIndicator(Modifier.fillMaxWidth(), color = Gold)
             }
         }
     }
