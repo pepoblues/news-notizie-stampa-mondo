@@ -69,9 +69,7 @@ fun InternalBrowser(url: String, onClose: () -> Unit) {
                 ),
                 navigationIcon = {
                     IconButton(onClick = {
-3
 webView?.stopLoading()
-4
 onClose()
                     }) {
                         Text("‹", color = Color.White)
