@@ -75,12 +75,12 @@ fun InternalBrowser(url: String, onClose: () -> Unit) {
                     }
                 },
                 title = {
-                    Text(
-                        text = pageTitle,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+    Text(
+        text = pageTitle,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
                 },
                 actions = {
                     IconButton(onClick = {
