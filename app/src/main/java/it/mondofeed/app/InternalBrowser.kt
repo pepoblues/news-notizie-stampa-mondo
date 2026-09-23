@@ -131,15 +131,27 @@ onClose()
                                 url: String?
                             ): Boolean = openInside(view, url)
 
-                            private fun openInside(view: WebView?, destination: String?): Boolean {
-                                val safeUrl = destination.orEmpty()
-                                if (safeUrl.startsWith("http://") || safeUrl.startsWith("https://")) {
-                                    loading = true
-                                    view?.loadUrl(safeUrl)
-                                }
-                                // true impedisce il passaggio a Chrome o ad altre app.
-                                return true
-                            }
+                            private fun openInside(
+    view: WebView?,
+    destination: String?
+): Boolean {
+    val safeUrl = destination.orEmpty()
+
+    if (safeUrl.contains("consent.google.com", ignoreCase = true)) {
+        loading = false
+        return true
+    }
+
+    if (
+        safeUrl.startsWith("http://") ||
+        safeUrl.startsWith("https://")
+    ) {
+        loading = true
+        view?.loadUrl(safeUrl)
+    }
+
+    return true
+}
 
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                 loading = true
