@@ -44,8 +44,9 @@ fun InternalBrowser(url: String, onClose: () -> Unit) {
     var loading by remember { mutableStateOf(true) }
     
     BackHandler {
-        if (webView?.canGoBack() == true) webView?.goBack() else onClose()
-    }
+webView?.stopLoading()
+onClose()
+}
 
     DisposableEffect(Unit) {
         onDispose {
