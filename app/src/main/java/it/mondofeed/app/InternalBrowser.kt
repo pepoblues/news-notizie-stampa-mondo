@@ -69,7 +69,10 @@ fun InternalBrowser(url: String, onClose: () -> Unit) {
                 ),
                 navigationIcon = {
                     IconButton(onClick = {
-                        if (webView?.canGoBack() == true) webView?.goBack() else onClose()
+3
+webView?.stopLoading()
+4
+onClose()
                     }) {
                         Text("‹", color = Color.White)
                     }
@@ -145,8 +148,12 @@ fun InternalBrowser(url: String, onClose: () -> Unit) {
 
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 loading = false
-                                view?.title?.takeIf { it.isNotBlank() }?.let { pageTitle = it }
-                            }
+                                override fun onPageFinished(
+    view: WebView?,
+    url: String?
+) {
+    loading = false
+}
 
                             override fun onReceivedError(
                                 view: WebView?,
@@ -158,10 +165,6 @@ fun InternalBrowser(url: String, onClose: () -> Unit) {
                         }
 
                         webChromeClient = object : WebChromeClient() {
-                            override fun onReceivedTitle(view: WebView?, title: String?) {
-                                title?.takeIf { it.isNotBlank() }?.let { pageTitle = it }
-                            }
-
                             override fun onCreateWindow(
                                 view: WebView?,
                                 isDialog: Boolean,
