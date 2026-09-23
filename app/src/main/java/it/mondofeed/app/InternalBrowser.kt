@@ -42,8 +42,7 @@ private val BrowserGold = Color(0xFFFFB800)
 fun InternalBrowser(url: String, onClose: () -> Unit) {
     var webView by remember { mutableStateOf<WebView?>(null) }
     var loading by remember { mutableStateOf(true) }
-    var pageTitle by remember { mutableStateOf("Articolo") }
-
+    
     BackHandler {
         if (webView?.canGoBack() == true) webView?.goBack() else onClose()
     }
