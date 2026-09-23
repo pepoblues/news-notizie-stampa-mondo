@@ -174,7 +174,6 @@ fun MondoFeedScreen(vm: MainViewModel = viewModel()) {
                         .clickable {
                             selectedCategory = null
                             selectedSource = null
-                            vm.showOverview()
                             scope.launch { drawer.close() }
                         }
                         .padding(16.dp),
