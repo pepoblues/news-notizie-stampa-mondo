@@ -897,29 +897,11 @@
     "territory": "Nazionale",
     "language": "it",
     "category": "economia",
-    "feedUrl": "https://www.ilsole24ore.com/rss/finanza.xml",
-    "websiteUrl": "https://www.ilsole24ore.com/",
-    "enabled": true
-  },
-  {
-    "id": "it-ilsole24ore-116",
-    "name": "Ilsole24Ore",
-    "country": "Italia",
-    "territory": "Nazionale",
-    "language": "it",
-    "category": "economia",
-    "feedUrl": "https://www.ilsole24ore.com/rss/norme-e-tributi.xml",
-    "websiteUrl": "https://www.ilsole24ore.com/",
-    "enabled": true
-  },
-  {
-    "id": "it-ilsole24ore-117",
-    "name": "Ilsole24Ore",
-    "country": "Italia",
-    "territory": "Nazionale",
-    "language": "it",
-    "category": "economia",
-    "feedUrl": "https://www.ilsole24ore.com/rss/risparmio.xml",
+    "feedUrls": [
+    "https://www.ilsole24ore.com/rss/finanza.xml",
+    "https://www.ilsole24ore.com/rss/norme-e-tributi.xml",
+    "https://www.ilsole24ore.com/rss/risparmio.xml"
+  ],
     "websiteUrl": "https://www.ilsole24ore.com/",
     "enabled": true
   },
